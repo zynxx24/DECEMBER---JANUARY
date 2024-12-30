@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FaSpotify, FaInstagram, FaTiktok } from 'react-icons/fa';
 import Members from './Memberlist/MembersList';
-import SmartImage from '../animation/Loader';
+import SmartImage from '../components/animation/Loader';
 
 interface Berita {
   'No induk': number;
@@ -22,7 +22,7 @@ const Users = () => {
     // Fetch data when the component mounts
     const fetchBerita = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:5000/berita');
+        const res = await fetch('http://localhost:5000/berita');
         if (!res.ok) {
           throw new Error(`Failed to fetch, status: ${res.status}`);
         }

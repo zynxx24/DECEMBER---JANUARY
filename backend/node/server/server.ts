@@ -255,7 +255,7 @@ app.post('/approve', async (req: Request, res: Response) => {
       // Send data to Flask server
       const response = await axios.post(CONFIG.FLASK_SERVER_URL, {
         nama: user.nama,
-        jumlah_bayar_kas: user.jumlah_bayar_kas,
+        kas: user.jumlah_bayar_kas,
       });
   
       console.log('Successfully sent data to Flask server:', response.data);

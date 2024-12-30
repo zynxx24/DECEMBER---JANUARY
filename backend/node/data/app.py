@@ -46,9 +46,9 @@ def update_kas():
     """Update jumlah kas berdasarkan nama."""
     data = request.json
     nama = data.get("nama")
-    jumlah_bayar_kas = float(data.get("jumlah_bayar_kas", 0))  
+    kas = float(data.get("jumlah_bayar_kas", 0))  
     print(data)
-    print(f'{nama} {jumlah_bayar_kas}')
+    print(f'{nama} {kas}')
 
     if not nama:
         return jsonify({"error": "Nama wajib diisi."}), 400
@@ -63,13 +63,13 @@ def update_kas():
         print("Before Update:", df.loc[df['Nama'] == nama])
 
         # Update jumlah kas
-        df.loc[df['Nama'] == nama, 'Jumlah Bayar Kas'] += jumlah_bayar_kas
+        df.loc[df['Nama'] == nama, 'Jumlah Bayar Kas'] += kas
 
         # Debug: After update
         print("After Update:", df.loc[df['Nama'] == nama])
     else:
         # Add new row if nama doesn't exist
-        new_row = {"Nama": nama, "Jumlah Bayar Kas": jumlah_bayar_kas}
+        new_row = {"Nama": nama, "Jumlah Bayar Kas": kas}
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
     save_excel_data(df)
@@ -80,7 +80,7 @@ def update_kas():
     if nama in df['Nama'].values:
         status = None
         # Update jumlah kas dan status
-        df.loc[df['Nama'] == nama, 'Jumlah Bayar Kas'] = jumlah_bayar_kas - jumlah_bayar_kas
+        df.loc[df['Nama'] == nama, 'Jumlah Bayar Kas'] = kas - kas
         df.loc[df['Nama'] == nama, 'Status'] = status
         print(df)
     save_excel_data(df)
@@ -134,22 +134,28 @@ def login():
     return jsonify({"message": f"Jumlah kas dan status untuk '{username}' berhasil diperbarui."})
 
 @app.route("/register", methods=["POST"])
-def login():
+def register():
     data = request.json
     username = data.get("username")
     password = data.get("password")
-    print(data)
+
+    if not username or not password:
+        return jsonify({"error": "Username dan password harus diisi."}), 400
 
     df = load_excel_auth()
-    #buat dan taruh namanya
+
+    # Cek apakah username sudah ada
     if username in df['Nama'].values:
-        df.loc[df['Nama'] += username, 'Checkin Count'] = +1
-        df.loc[df['Nama'] += username, 'Password'] = password
-        print(df)
+        # Update Checkin Count dan Password
+        df.loc[df['Nama'] == username, 'Checkin Count'] += 1
+        df.loc[df['Nama'] == username, 'Password'] = password
+    else:
+        # Tambahkan data baru jika username tidak ditemukan
+        new_data = {"Nama": username, "Password": password, "Checkin Count": 1}
+        df = df.append(new_data, ignore_index=True)
 
     save_excel_auth(df)
-    print(df)
-    return jsonify({"message": f"Jumlah kas dan status untuk '{username}' berhasil diperbarui."})
+    return jsonify({"message": f"Data untuk '{username}' berhasil diperbarui atau ditambahkan."})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
