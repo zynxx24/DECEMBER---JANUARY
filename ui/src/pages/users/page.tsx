@@ -18,11 +18,11 @@ const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredNews, setFilteredNews] = useState<Berita[]>([]);
 
+  // Fetch berita data
   useEffect(() => {
-    // Fetch data when the component mounts
     const fetchBerita = async () => {
       try {
-        const res = await fetch('http://localhost:5000/berita');
+        const res = await fetch('http://localhost:5000/berita', { cache: 'no-store' });
         if (!res.ok) {
           throw new Error(`Failed to fetch, status: ${res.status}`);
         }
@@ -35,11 +35,11 @@ const Users = () => {
       }
     };
 
-    fetchBerita();
+    fetchBerita(); // Call the async function inside useEffect
   }, []);
 
+  // Filter news when searchTerm or beritaTerbaru changes
   useEffect(() => {
-    // Filter news when searchTerm or beritaTerbaru changes
     if (searchTerm) {
       const filtered = beritaTerbaru.filter((berita) =>
         berita.Judul.toLowerCase().includes(searchTerm.toLowerCase())

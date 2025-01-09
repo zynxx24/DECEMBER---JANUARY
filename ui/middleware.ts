@@ -1,38 +1,41 @@
+          // middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// Define role-based access rules
-const RoleBasedAccess = {
-  admin: ['/admin/page'], // Path for admin pages
-  user: ['/users/page'],  // Path for user pages
-};
+import { RoleBasedAccess } from './roles';
 
 export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
-  const roleCookie = request.cookies.get('role')?.value; // Retrieve role from cookie
+  const roleCookie = request.cookies.get('Role')?.value;
 
-  // Redirect to login if no role cookie is present
+  console.log(`[Middleware] Role: ${roleCookie}, Path: ${url.pathname}`);
+
+  // Redirect to login if no role is found
   if (!roleCookie) {
-    url.pathname = '/components/login';
+    console.warn(`[Middleware] No role cookie found. Redirecting to login.`);
+    url.pathname = '/';
     return NextResponse.redirect(url);
   }
 
-  // Get allowed paths for the role
+  // Get allowed paths for the user's role
   const allowedPaths = RoleBasedAccess[roleCookie as keyof typeof RoleBasedAccess] || [];
 
-  // Check if the current path is authorized
-  const isPathAllowed = allowedPaths.some((path) => url.pathname.startsWith(path));
+  // Check if the requested path is allowed
+  const isPathAllowed = allowedPaths.some((path) =>
+    path.endsWith('*') // Handle wildcards
+      ? url.pathname.startsWith(path.slice(0, -1))
+      : url.pathname === path
+  );
+
   if (!isPathAllowed) {
-    // Redirect unauthorized users to a 403 page
-    url.pathname = '/404'; // Custom 403 error page
+    console.error(`[Middleware] Unauthorized access attempt to ${url.pathname}`);
+    url.pathname = '/404'; // Redirect to a "403 Forbidden" page
     return NextResponse.rewrite(url);
   }
 
-  // Allow access to authorized users
-  return NextResponse.next();
+  return NextResponse.next(); // Allow access
 }
 
 // Middleware configuration
 export const config = {
-  matcher: ['/admin/:path*', '/users/:path*'], // Apply middleware only to these paths
+  matcher: ['/admin/:path*', '/users/:path*', '/'], // Define applicable routes
 };

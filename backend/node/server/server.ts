@@ -1,11 +1,9 @@
-// Import required modules
 import express, { Request, Response } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import XLSX from 'xlsx';
-import axios from 'axios';
 import path from 'path';
-import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 // Initialize Express app
 const app = express();
@@ -18,337 +16,361 @@ app.use(bodyParser.json());
 
 // Configuration object
 const CONFIG = {
-    FILE_PATH_USER: path.resolve(__dirname, '../data/data.xlsx'),
-    FILE_PATH_BERITA: path.resolve(__dirname, '../data/berita.xlsx'),
-    FILE_PATH_SAVED: path.resolve(__dirname, '../data/saved.xlsx'),
-    FILE_PATH_AUTH: path.resolve(__dirname, '../data/auth.xlsx'),
-    FILE_PATH_KAS: path.resolve(__dirname, '../data/kas.xlsx'),
-    FLASK_SERVER_URL: 'http://127.0.0.1:8000/update_kas',
-    FLASK_SERVER_URL2: 'http://127.0.0.1:8000/draft',
-    
+    FILE_PATHS: {
+        DATA: path.resolve(__dirname, '../data/data.xlsx'),
+        BERITA: path.resolve(__dirname, '../data/berita.xlsx'),
+        SAVED: path.resolve(__dirname, '../data/saved.xlsx'),
+        AUTH: path.resolve(__dirname, '../data/auth.xlsx'),
+        DEMO: path.resolve(__dirname, '../data/demo.xlsx'),
+        LIST: path.resolve(__dirname, '../data/list.xlsx')
+    },
+    SALT: 'your-secret-salt-key' // Make sure to use a secure salt in production
 };
 
-// Interface for row data
-interface RowData {
-    [x: string]: any;
+// Interfaces
+interface UserData {
     Nama?: string;
-    Kelas?: string;
+    Email?: string;
     'Jumlah Bayar Kas'?: number;
-    Nomor?: number;
     Status?: string;
+    Password?: string;
+    'Checkin Count'?: number;
+    Role?: string;
+    Kelas?: string;
+    Jabatan?: string;
+    Nomor?: number;
     'Foto Orangnya'?: string;
 }
 
-interface User {
-    Username: string;
-    Password: string;
-    Role: string;
+interface NewsData {
+    id: number;
+    title: string;
+    content: string;
+    date: string;
+    author: string;
 }
 
+interface FileOperationResult {
+    success: boolean;
+    data?: any;
+    error?: string;
+}
 
-/*****************************/
-/********* UTILITY ***********/
-/*****************************/
-
-/**
- * Reads and filters user data from XLSX file.
- * @returns {RowData[]} Filtered data as JSON array.
- */
-const readFilteredUserXLSX = (): RowData[] => {
-    console.log('Reading user data from file:', CONFIG.FILE_PATH_USER);
-    const workbook = XLSX.readFile(CONFIG.FILE_PATH_USER);
-    const sheetName = workbook.SheetNames[0];
-    console.log('Found sheet name:', sheetName);
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet).map((row: any) => ({
-        Nama: row['Nama'],
-        Kelas: row['Kelas'],
-        Kas: row['Jumlah Bayar Kas'],
-        Jabatan: row['Jabatan'],
-        Nomor: row['No'],
-        Foto: row['Foto Orangnya'],
-    }));
-    return data;
-};
-
-const ReadSaved = (): RowData[] => {
-    console.log('Reading user data from file:', CONFIG.FILE_PATH_SAVED);
-    const workbook = XLSX.readFile(CONFIG.FILE_PATH_SAVED);
-    const sheetName = workbook.SheetNames[0];
-    console.log('Found sheet name:', sheetName);
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet).map((row: any) => ({
-        Nama: row['Nama'],
-        'Jumlah Bayar Kas': row['Jumlah Bayar Kas'],
-        Status: row['Status'],
-    }));
-    return data;
-};
-
-
-
-/**
- * Reads news data from XLSX file.
- * @returns {any[]} Parsed data as JSON array.
- */
-const readNewsXLSX = (): any[] => {
-    console.log('Reading news data from file:', CONFIG.FILE_PATH_BERITA);
-    const workbook = XLSX.readFile(CONFIG.FILE_PATH_BERITA);
-    const sheetName = workbook.SheetNames[0];
-    console.log('Found sheet name:', sheetName);
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet);
-    return data;
-};
-
-/**
- * Reads authentication data from XLSX.
- * @returns {User[]} List of users with roles.
- */
-const readAuthXLSX = (): User[] => {
-    const workbook = XLSX.readFile(CONFIG.FILE_PATH_AUTH);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet) as User[];
-};
-
-
-/**
- * Write updated authentication data to XLSX.
- * @param {User[]} data Authentication data.
- */
-const writeAuthXLSX = (data: User[]) => {
-    const workbook = XLSX.readFile(CONFIG.FILE_PATH_AUTH);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    workbook.Sheets[sheetName] = worksheet;
-    XLSX.writeFile(workbook, CONFIG.FILE_PATH_AUTH);
-};
-
-/**
- * Authenticate a user based on username and password.
- * @param {string} username
- * @param {string} password
- * @returns {User | null} Authenticated user or null.
- */
-const authenticateUser = (Username: string, Password: string): User | null => {
-    const users = readAuthXLSX();
-    const user = users.find((u) => u.Username === Username);
-    if (user && bcrypt.compareSync(Password, user.Password)) {
-        return user;
+// Security Utils
+class SecurityUtils {
+    static hashPassword(password: string): string {
+        return crypto
+            .createHash('sha256')
+            .update(password + CONFIG.SALT)
+            .digest('hex');
     }
-    return null;
-};
 
-/**
- * Register a new user.
- * @param {string} username
- * @param {string} password
- * @param {string} role
- */
-const registerUser = (Username: string, Password: string, Role: string = 'user') => {
-    const users = readAuthXLSX();
-    if (users.find((u) => u.Username === Username)) {
-        throw new Error('Username already exists');
+    static verifyPassword(inputPassword: string, hashedPassword: string): boolean {
+        const hashedInput = this.hashPassword(inputPassword);
+        return hashedInput === hashedPassword;
     }
-    const hashedPassword = bcrypt.hashSync(Password, 10);
-    users.push({ Username, Password: hashedPassword, Role });
-    writeAuthXLSX(users);
-};
+}
 
-/**
- * Update user role (Admin only).
- * @param {string} username
- * @param {string} newRole
- */
-const updateUserRole = (Username: string, newRole: string) => {
-    const users = readAuthXLSX();
-    const userIndex = users.findIndex((u) => u.Username === Username);
-    if (userIndex === -1) {
-        throw new Error('User not found');
+// Enhanced File Operations
+class ExcelFileManager {
+    private static instance: ExcelFileManager;
+    
+    private constructor() {}
+    
+    static getInstance(): ExcelFileManager {
+        if (!ExcelFileManager.instance) {
+            ExcelFileManager.instance = new ExcelFileManager();
+        }
+        return ExcelFileManager.instance;
     }
-    users[userIndex].Role = newRole;
-    writeAuthXLSX(users);
-};
 
-/*****************************/
-/********* ROUTES ************/
-/*****************************/
-
-/**
- * Fetch user data
- */
-app.get('/data', (req: Request, res: Response) => {
-    console.log('GET /data request received');
-    try {
-        const data = readFilteredUserXLSX();
-        res.json({ success: true, data });
-        console.log('Successfully retrieved filtered user data!');
-    } catch (error) {
-        console.error('Failed to read user data file:', error);
-        res.status(500).json({ success: false, message: 'Failed to read user data file.' });
-    }
-});
-
-app.get('/draft', (req: Request, res: Response) => {
-    console.log('GET /data request received');
-    const data = ReadSaved();
-    res.json(data);
-});
-
-/**
- * Handle check-in requests
- */
-app.post('/checkin', async(req: Request, res: Response) => {
-    const { nama, kas, status } = req.body;
-    const data = readFilteredUserXLSX();
-    const user = data.find((row) => row.Nama === nama);
-    const got = kas
-    const sst = status
-    if (user) {
+    async loadWorkbook(filePath: string): Promise<XLSX.WorkBook> {
         try {
-            data.push({ Nama: nama, Kas: got, Status: 'Pending' });
-            const response = await axios.post(CONFIG.FLASK_SERVER_URL2, {
-                nama, got, sst
-            });
-                console.log('Successfully sent data to Flask server:', response.data);
-            } catch (error) {
-                console.error('Failed to send data to Flask server:', error);
-            }
-        res.status(201).json({ message: 'Check-in request sent!' });
-    }
-});
-
-/**
- * Fetch news data
- */
-app.get('/berita', (req: Request, res: Response) => {
-    console.log('GET /berita request received');
-    try {
-        const data = readNewsXLSX();
-        res.json({ success: true, data });
-        console.log('Successfully retrieved news data!');
-    } catch (error) {
-        console.error('Failed to read news data file:', error);
-    }
-});
-
-/**
- * Approve or reject user requests
- */
-app.post('/approve', async (req: Request, res: Response) => {
-    console.log('POST /approve request received');
-  
-    // Destructure and validate the required fields
-    const { nama, approve, kasAmount } = req.body;
-
-  
-    // Prepare the user data
-    const user = {
-      nama,
-      jumlah_bayar_kas: kasAmount,
-      status: approve ? 'Approved' : 'Rejected',
-    };
-  
-    console.log(`Updating user status for ${user.nama} to ${user.status}`);
-  
-    try {
-      // Send data to Flask server
-      const response = await axios.post(CONFIG.FLASK_SERVER_URL, {
-        nama: user.nama,
-        kas: user.jumlah_bayar_kas,
-      });
-  
-      console.log('Successfully sent data to Flask server:', response.data);
-  
-      // Respond back to the client
-      res.status(200).json({
-        message: `User ${user.nama} successfully processed.`,
-        serverResponse: response.data,
-      });
-    } catch (error) {
-      console.error('Failed to send data to Flask server:', error);
-  
-      // Respond with
-    }
-});
-
-  /**
- * Login route.
- */
-app.post('/login', (req: Request, res: Response) => {
-    const { Username, Password } = req.body;
-
-    if (!Username || !Password) {
-        res.status(400).json({ success: false, message: 'Username and Password are required' });
-    }
-
-    try {
-        const user = authenticateUser(Username, Password);
-        if (user) {
-            // Return minimal information for security
-            res.json({ success: true, Role: user.Role });
-        } else {
-            res.status(401).json({ success: false, message: 'Invalid username or password' });
+            return XLSX.readFile(filePath);
+        } catch (error) {
+            throw new Error(`Failed to load workbook: ${error}`);
         }
-    } catch (error) {
-        console.error('Login error:', error); // Logging the exact error for debugging
-        res.status(500).json({ success: false, message: 'An internal error occurred during login' });
-    }
-});
-
-
-/**
- * Register route (Admin only).
- */
-app.post('/register', (req: Request, res: Response) => {
-    const { adminUsername, adminPassword, username, password, role } = req.body;
-
-    if (!adminUsername || !adminPassword || !username || !password) {
-        res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
-    try {
-        // Validate admin credentials
-        const admin = authenticateUser(adminUsername, adminPassword);
-        if (!admin || admin.Role !== 'admin') {
-            res.status(403).json({ success: false, message: 'Access denied. Admin credentials are invalid.' });
-        }
-
-        // Register the new user
+    async saveWorkbook(workbook: XLSX.WorkBook, filePath: string): Promise<void> {
         try {
-            registerUser(username, password, role || 'user');
-            res.status(201).json({ success: true, message: 'User registered successfully' });
-        } catch (err: any) {
-            if (err.message === 'Username already exists') {
-                res.status(409).json({ success: false, message: 'Username already exists' });
+            XLSX.writeFile(workbook, filePath);
+        } catch (error) {
+            throw new Error(`Failed to save workbook: ${error}`);
+        }
+    }
+
+    async readFile(filePath: string): Promise<any[]> {
+        try {
+            const workbook = await this.loadWorkbook(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            return XLSX.utils.sheet_to_json(sheet);
+        } catch (error) {
+            throw new Error(`Failed to read file: ${error}`);
+        }
+    }
+
+    async updateFile(filePath: string, data: any[]): Promise<void> {
+        try {
+            const workbook = await this.loadWorkbook(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            workbook.Sheets[sheetName] = worksheet;
+            await this.saveWorkbook(workbook, filePath);
+        } catch (error) {
+            throw new Error(`Failed to update file: ${error}`);
+        }
+    }
+}
+
+// Enhanced User Management
+class UserManager {
+    private fileManager: ExcelFileManager;
+
+    constructor() {
+        this.fileManager = ExcelFileManager.getInstance();
+    }
+
+    async getFilteredUserData(): Promise<FileOperationResult> {
+        try {
+            const data = await this.fileManager.readFile(CONFIG.FILE_PATHS.DATA);
+            const filteredData = data.map(row => ({
+                Nama: row['Nama'],
+                Kelas: row['Kelas'],
+                Kas: row['Jumlah Bayar Kas'],
+                Jabatan: row['Jabatan'],
+                Nomor: row['No'],
+                Foto: row['Foto Orangnya'],
+            }));
+            return { success: true, data: filteredData };
+        } catch (error) {
+            return { success: false, error: `Failed to get user data: ${error}` };
+        }
+    }
+
+    async getNews(): Promise<FileOperationResult> {
+        try {
+            const data = await this.fileManager.readFile(CONFIG.FILE_PATHS.BERITA);
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: `Failed to get news: ${error}` };
+        }
+    }
+
+    async updateKasAmount(nama: string, kasAmount: number): Promise<FileOperationResult> {
+        try {
+            const data = await this.fileManager.readFile(CONFIG.FILE_PATHS.DATA);
+            const userIndex = data.findIndex(user => user.Nama === nama);
+
+            if (userIndex !== -1) {
+                data[userIndex]['Jumlah Bayar Kas'] = (data[userIndex]['Jumlah Bayar Kas'] || 0) + kasAmount;
+            } else {
+                data.push({ Nama: nama, 'Jumlah Bayar Kas': kasAmount });
             }
-            throw err; // For unexpected errors
+
+            await this.fileManager.updateFile(CONFIG.FILE_PATHS.DATA, data);
+
+            // Update draft file
+            const draftData = await this.fileManager.readFile(CONFIG.FILE_PATHS.SAVED);
+            const draftIndex = draftData.findIndex(user => user.Nama === nama);
+
+            if (draftIndex !== -1) {
+                draftData[draftIndex]['Jumlah Bayar Kas'] = 0;
+                draftData[draftIndex].Status = "none";
+                await this.fileManager.updateFile(CONFIG.FILE_PATHS.SAVED, draftData);
+            }
+
+            return { success: true, data: { message: `Cash amount for '${nama}' successfully updated` } };
+        } catch (error) {
+            return { success: false, error: `Failed to update kas amount: ${error}` };
         }
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ success: false, message: 'An internal error occurred during registration' });
     }
-});
 
+    async updateDraft(nama: string, kasAmount: number, status: string): Promise<FileOperationResult> {
+        try {
+            const data = await this.fileManager.readFile(CONFIG.FILE_PATHS.SAVED);
+            const userIndex = data.findIndex(user => user.Nama === nama);
 
-/**
- * Update role route (Admin only).
- */
-app.put('/update-role', (req: Request, res: Response) => {
-    const { adminUsername, adminPassword, username, newRole } = req.body;
-    try {
-        const admin = authenticateUser(adminUsername, adminPassword);
-        if (admin?.Role !== 'admin') {
-            res.status(403).json({ success: false, message: 'Access denied' });
+            if (userIndex !== -1) {
+                data[userIndex]['Jumlah Bayar Kas'] = (data[userIndex]['Jumlah Bayar Kas'] || 0) + kasAmount;
+                data[userIndex].Status = status;
+            } else {
+                data.push({ Nama: nama, 'Jumlah Bayar Kas': kasAmount, Status: status });
+            }
+
+            await this.fileManager.updateFile(CONFIG.FILE_PATHS.SAVED, data);
+            return { 
+                success: true, 
+                data: { 
+                    message: `Draft data for '${nama}' successfully updated`,
+                    updatedData: data
+                } 
+            };
+        } catch (error) {
+            return { success: false, error: `Failed to update draft: ${error}` };
         }
-        updateUserRole(username, newRole);
-        res.status(200).json({ success: true, message: 'Role updated successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error });
     }
-});
 
+    async registerUser(email: string, password: string): Promise<FileOperationResult> {
+        try {
+            const data = await this.fileManager.readFile(CONFIG.FILE_PATHS.DEMO);
+            const userIndex = data.findIndex(user => user.Email === email);
+            const hashedPassword = SecurityUtils.hashPassword(password);
+
+            if (userIndex !== -1) {
+                data[userIndex]['Checkin Count'] = (data[userIndex]['Checkin Count'] || 0) + 1;
+                data[userIndex].Password = hashedPassword;
+                data[userIndex].Role = 'user';
+            } else {
+                data.push({
+                    Email: email,
+                    Password: hashedPassword,
+                    'Checkin Count': 1,
+                    Role: 'user'
+                });
+            }
+
+            await this.fileManager.updateFile(CONFIG.FILE_PATHS.DEMO, data);
+            return { success: true, data: { message: `Registration successful for '${email}'` } };
+        } catch (error) {
+            return { success: false, error: `Failed to register user: ${error}` };
+        }
+    }
+
+    async verifyLogin(email: string, password: string): Promise<FileOperationResult> {
+        try {
+            const data = await this.fileManager.readFile(CONFIG.FILE_PATHS.DEMO);
+            const user = data.find(u => u.Email === email);
+
+            if (!user) {
+                return { success: false, error: 'User not found' };
+            }
+
+            if (!SecurityUtils.verifyPassword(password, user.Password)) {
+                return { success: false, error: 'Invalid password' };
+            }
+
+            // Update check-in count
+            await this.handleLogin(email);
+
+            return { 
+                success: true, 
+                data: { 
+                    message: 'Login successful',
+                    role: user.Role 
+                } 
+            };
+        } catch (error) {
+            return { success: false, error: `Failed to verify login: ${error}` };
+        }
+    }
+
+    private async handleLogin(email: string): Promise<void> {
+        const files = [CONFIG.FILE_PATHS.DATA, CONFIG.FILE_PATHS.DEMO];
+        
+        for (const filePath of files) {
+            const data = await this.fileManager.readFile(filePath);
+            const userIndex = data.findIndex(user => user.Email === email);
             
+            if (userIndex !== -1) {
+                data[userIndex]['Checkin Count'] = (data[userIndex]['Checkin Count'] || 0) + 1;
+                await this.fileManager.updateFile(filePath, data);
+            }
+        }
+    }
+}
+
+// Initialize managers
+const userManager = new UserManager();
+
+// Routes
+app.get('/data', async (_req: Request, res: Response) => {
+    const result = await userManager.getFilteredUserData();
+    if (!result.success) {
+        res.status(500).json(result);
+    }
+    res.json(result);
+});
+
+app.get('/berita', async (_req: Request, res: Response) => {
+    const result = await userManager.getNews();
+    if (!result.success) {
+        res.status(500).json(result);
+    }
+    res.json(result);
+});
+
+app.post('/draft', async (req: Request, res: Response) => {
+    const { nama, got: kasAmount, sst: status } = req.body;
+    
+    if (!nama || !status) {
+        res.status(400).json({ 
+            success: false, 
+            error: 'Name and status are required' 
+        });
+    }
+
+    const result = await userManager.updateDraft(nama, Number(kasAmount) || 0, status);
+    if (!result.success) {
+        res.status(500).json(result);
+    }
+    
+    res.json(result);
+});
+
+app.post('/update_data', async (req: Request, res: Response) => {
+    const { nama, jumlah_bayar_kas } = req.body;
+    
+    if (!nama || jumlah_bayar_kas === undefined) {
+        res.status(400).json({ 
+            success: false, 
+            error: 'Name and cash amount are required' 
+        });
+    }
+
+    const result = await userManager.updateKasAmount(nama, Number(jumlah_bayar_kas));
+    if (!result.success) {
+        res.status(500).json(result);
+    }
+    res.json(result);
+});
+
+app.post('/login', async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        res.status(400).json({ 
+            success: false, 
+            error: 'Email and password are required' 
+        });
+    }
+
+    const result = await userManager.verifyLogin(email, password);
+    if (!result.success) {
+        res.status(401).json(result);
+    }
+    
+    res.json(result);
+});
+
+app.post('/register', async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        res.status(400).json({ 
+            success: false, 
+            error: 'Email and password are required' 
+        });
+    }
+
+    const result = await userManager.registerUser(email, password);
+    if (!result.success) {
+        res.status(500).json(result);
+    }
+    res.json(result);
+});
+
 // Start the server
 app.listen(PORT, HOST, () => {
     console.log(`Server running at http://${HOST}:${PORT}/`);
