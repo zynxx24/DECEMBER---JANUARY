@@ -126,6 +126,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const formatCurrency = (amount: number | undefined | null): string => {
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      return 'Rp 0';
+    }
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
   const renderDashboard = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -141,7 +152,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-gray-500 text-sm">Total Kas</p>
-            <p className="text-2xl font-bold">Rp {stats.totalKas.toLocaleString()}</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.totalKas * 10000)}</p>
           </div>
           <FileText className="text-green-500" size={24} />
         </div>
@@ -239,7 +250,7 @@ export default function AdminDashboard() {
                 <td className="px-6 py-4 whitespace-nowrap">{member.Nama}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{member.Kelas}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{member.Kas}</td>
-                <td className="px-6 py-4 whitespace-nowrap">Rp {member.Kas.toLocaleString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(member.Kas * 10000)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{member.Jabatan}</td>
               </tr>
             ))}
