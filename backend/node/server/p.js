@@ -1,11 +1,6 @@
-const bcrypt = require('bcrypt');
-const userPassword = 'user_password'; // Replace with the actual password
-bcrypt.hash(userPassword,(err, hash) => {
-    if (err) {
-        // Handle error
-        return;
-    }
+const crypto = require('crypto')
 
-// Hashing successful, 'hash' contains the hashed password
-console.log('Hashed password:', hash);
-});
+const password1 = "UmxWRFN5QkdUMUlnUmtsQlZDd2dUVVZTUlV0QklFMUZUa2RWUWtGSUlFdEZTRWxFVlZCQlRpQkxSVXhWUVZKSFFVdFZJU0JFUVU0ZwpTMVZCVGxSVlRTQkxUMDVRVlZSRlVpQlpRVTVISUZOQlRrZEJWQ0JQVUNCTlJVMUNWVUZVSUVGSklGTkZUVUZMU1U0Z1IwRk9RVk1LCg=="
+const password2 = "VVZWMFZrbEdUbFpTUlVaSlNVVXhSbFJWU2xaUlZsRm5VekJHVFZOVlJrOUpSazVHVkd0R1QxSjVSV2RWTUZaT1ZEQmtRa2xGVWtaVQphMlJDVkdsQ1NsUnJhMmRUTUVaTlUxVkdUd3BKUlVwQ1ZHdGtTRkZSYnowSwo="
+const hash = crypto.createHash('sha256').update(password1 + password2).digest('sha');
+console.log(hash)

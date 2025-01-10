@@ -41,8 +41,9 @@ export default function AdminDashboard() {
       // Fetch requests
       const requestsResponse = await fetch('http://localhost:5000/draft');
       const requestsData = await requestsResponse.json();
+      console.log(requestsData)
       const pendingRequests = requestsData.data?.filter(
-        (request: RequestData) => request.Status.toLowerCase() === 'pending'
+        (request: any) => request.Status?.toLowerCase() === 'pending'
       ) || [];
       setRequests(pendingRequests);
       
@@ -55,15 +56,16 @@ export default function AdminDashboard() {
         // Calculate statistics
         setStats({
           totalMembers: membersData.data.length,
-          totalKas: membersData.data.reduce((sum: number, member: MemberData) => sum + (member.Kas || 0), 0),
+          totalKas: membersData.data.reduce((sum: number, member: MemberData) => sum + (member.Kas || 0) * 10000, 0),
           pendingRequests: pendingRequests.length
         });
       }
     } catch (error) {
       setAlert({
         type: 'error',
-        message: 'Failed to fetch data. Please try again later.'
-      });
+        message: 'Failed to fetch data. Please try again later.',
+      })
+      console.log(error);
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,7 @@ export default function AdminDashboard() {
       }
 
       // Update the draft status
-      const draftResponse = await fetch('http://localhost:5000/draft', {
+      const draftResponse = await fetch('http://localhost:5000/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -226,6 +228,7 @@ export default function AdminDashboard() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kas Streak</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kas Amount</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
             </tr>
@@ -235,6 +238,7 @@ export default function AdminDashboard() {
               <tr key={member.Nama} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">{member.Nama}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{member.Kelas}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{member.Kas}</td>
                 <td className="px-6 py-4 whitespace-nowrap">Rp {member.Kas.toLocaleString()}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{member.Jabatan}</td>
               </tr>
