@@ -1,10 +1,13 @@
 {
+  "homepage" : "https:///zynxx24.github.io/xrpl",
   "name": "ui",
   "version": "0.1.0",
   "private": false,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "predeploy":"npm run build",
+    "deploy":"gh-pages -d build",
     "start": "next start",
     "lint": "next lint"
   },
