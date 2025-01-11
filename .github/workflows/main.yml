@@ -26,6 +26,8 @@ jobs:
         
     - name: Install Dependencies for Frontend
       run: |
+        sudo apt update
+        sudo apt update -y
         cd ui
         npm ci
       
