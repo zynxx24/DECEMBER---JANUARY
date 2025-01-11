@@ -51,7 +51,7 @@ jobs:
       run: |
         cd backend/node/server
         npm run start &
-        npx wait-on http://localhost:3000
+        npx wait-on http://localhost:5000
 
     - name: Run Tests
       run: npm test
