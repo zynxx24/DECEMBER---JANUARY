@@ -50,8 +50,7 @@ jobs:
     - name: Start Backend for Testing
       run: |
         cd backend/node/server
-        npm run start &
-        npx wait-on http://localhost:5000
+        nohup npm run start > backend.log 2>&1 &
 
     - name: Run Tests
       run: npm test
