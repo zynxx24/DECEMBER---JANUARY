@@ -12,7 +12,7 @@ export default function CheckinPage() {
   const [showModal, setShowModal] = useState(false);
   const [status, setStatus] = useState('Pending');
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: { target: { name: any; value: any; }; }) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -20,7 +20,7 @@ export default function CheckinPage() {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: { preventDefault: () => void; }) => {
     e.preventDefault();
     
     if (!formData.nama || !formData.jumlahKas || Number(formData.jumlahKas) <= 0) {
@@ -46,14 +46,14 @@ export default function CheckinPage() {
   };
 
   useEffect(() => {
-    let interval;
+    let interval: string | number | NodeJS.Timeout | undefined;
     
     if (showModal && status === 'Pending') {
       interval = setInterval(async () => {
         try {
           const response = await axios.get(`http://localhost:5000/draft`);
           const userDraft = response.data.data.find(
-            draft => draft.Nama === formData.nama
+            (            draft: { Nama: string; }) => draft.Nama === formData.nama
           );
           
           if (userDraft && userDraft.Status !== 'Pending') {

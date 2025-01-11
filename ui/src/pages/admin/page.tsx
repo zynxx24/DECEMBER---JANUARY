@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Users, FileText, Home } from 'lucide-react';
-import { Alert, AlertTitle, AlertDescription } from './components/Alert';
+import { Alert, AlertTitle, AlertDescription } from '../../plugin/Alert';
 
 interface RequestData {
   Nama: string;
