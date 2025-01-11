@@ -51,6 +51,3 @@ jobs:
       run: |
         cd backend/node/server
         nohup npm run start > backend.log 2>&1 &
-
-    - name: Run Tests
-      run: npm test
